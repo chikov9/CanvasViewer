@@ -15,7 +15,8 @@
 			var image = new Image();
 			image.onload = function() {
 				canvas.getContext('2d').drawImage(image,0,0);
-				viewer.addLayer('dicom',0,0,420,510,canvas);
+				var layer = new CanvasLayer('dicom',0,0,420,510,canvas);
+				viewer.addLayer(layer,CanvasViewer.LAYOUT_CENTER);
 			}
 			image.src = 'images.jpg';
 			$('#toolselect').change(function() {

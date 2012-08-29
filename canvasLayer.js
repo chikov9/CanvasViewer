@@ -8,6 +8,8 @@ function CanvasLayer(name, x, y, width, height, canvas){
 }
 CanvasLayer.prototype.getX = function(){return this.x;}
 CanvasLayer.prototype.getY = function(){return this.y;}
+CanvasLayer.prototype.setX = function(val){return this.x = val;}
+CanvasLayer.prototype.setY = function(val){return this.y = val;}
 CanvasLayer.prototype.getName = function(){return this.name;}
 CanvasLayer.prototype.getWidth = function(){return this.width;}
 CanvasLayer.prototype.getHeight = function(){return this.height;}

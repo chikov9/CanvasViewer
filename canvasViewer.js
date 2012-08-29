@@ -62,7 +62,7 @@ function CanvasViewer(board, view_canvas, tmp_canvas,viewerWidth, viewerHeight){
 				switch(self.tool.name){
 					case 'none':
 						break;
-					case 'line':
+					default:
 						var func = self.tool[event.type];
 						if (func) {
 						  console.log('mouse down');
@@ -79,7 +79,7 @@ function CanvasViewer(board, view_canvas, tmp_canvas,viewerWidth, viewerHeight){
 				switch(self.tool.name){
 					case 'none':
 						break;
-					case 'line':
+					default:
 						var func = self.tool[event.type];
 						if (func) {
 						  console.log('mouse up');
@@ -102,7 +102,7 @@ function CanvasViewer(board, view_canvas, tmp_canvas,viewerWidth, viewerHeight){
 					case 'none':
 						self.translateImage(delta);
 						break;
-					case 'line':
+					default:
 						var func = self.tool[event.type];
 						if (func) {
 						  console.log('drawing line');
@@ -168,11 +168,81 @@ CanvasViewer.prototype.init = function(){
 	this.draw();
 	this.bindEvents();
 }
-CanvasViewer.prototype.setTool=function(tool){
-	this.tool = new tools[tool];
+CanvasViewer.prototype.changeSurface=function(board, view_canvas, tmp_canvas){
+	this.view_canvas = view_canvas;
+	this.tmp_canvas = tmp_canvas;
+	this.board = board;
+	this.main_ctx = this.view_canvas.getContext('2d');
+	this.tmp_ctx = this.tmp_canvas.getContext('2d');
+	this.visibleSize={w:0,h:0};
+	this.imageOrigin = {x:0,y:0};
+	this.zoom = 0.99;
+	this.canZoom = true;
+	this.init();
 }
-CanvasViewer.prototype.addLayer = function(name, x, y, width, height, canvas){
-	var layer = new CanvasLayer(name, x+this.imageOrigin.x, y+this.imageOrigin.y, width, height, canvas);
+CanvasViewer.prototype.setTool=function(toolname){
+	var self = this;
+	if(toolname in tools){
+		this.tool = new tools[toolname];
+	}else{
+		console.log('registering new tool');
+		tools[toolname] = function () {
+			var tool = this;
+			this.started = false;
+			this.name = toolname;
+			this.invoke = function(ev){
+				for(var i =0; i<self.layers.length; i++){
+					var layer = self.layers[i];
+					var func = layer[ev.type];
+					if (func) {
+					  func(ev);
+					}
+				}
+			}
+			// This is called when you start holding down the mouse button.
+			// This starts the pencil drawing.
+			this.mousedown = function (ev,context) {
+				tool.started = true;
+				tool.invoke(ev);
+			};
+
+			// This function is called every time you move the mouse. Obviously, it only 
+			// draws if the tool.started state is set to true (when you are holding down 
+			// the mouse button).
+			this.mousemove = function (ev,context) {
+			  if (tool.started) {
+				console.log(ev._x+" "+ev._y);
+				tool.invoke(ev);
+			  }
+			};
+
+			// This is called when you release the mouse button.
+			this.mouseup = function (ev,context) {
+			  if (tool.started) {
+				tool.invoke(ev);
+				tool.started = false;
+			  }
+			};
+		};
+		this.tool = new tools[toolname];
+	}
+}
+CanvasViewer.LAYOUT_CENTER = 0;
+CanvasViewer.prototype.addLayer = function(layer,layout){ //layout 0=center, 1=top, 2=left, 3=right, 4=bottom
+	if(layout===CanvasViewer.LAYOUT_CENTER){
+		layer.setX(layer.getX()+this.innerCanvas.width/2 - this.view_canvas.width/2);
+		layer.setY(layer.getY()+this.innerCanvas.height/2 - this.view_canvas.height/2);
+	}else{
+		layer.setX(layer.getX()+this.imageOrigin.x);
+		layer.setY(layer.getY()+this.imageOrigin.y);	
+	}
+	for(var i = 0; i< this.layers.length; i++){
+		if(layer.getName() == this.layers[i].getName()){
+			this.layers[i] = layer;
+			this.draw();
+			return;
+		}
+	}
 	this.layers.push(layer);
 	this.draw();
 }
@@ -201,6 +271,11 @@ CanvasViewer.prototype.drawBackground = function(){
 		}
 		countA++;
 	}
+}
+CanvasViewer.prototype.clearDrawings = function(){
+	console.log('clearing drawings');
+	this.innerCanvasDrawingsCtx.clearRect(0, 0, this.innerCanvasDrawings.width, this.innerCanvasDrawings.height);
+	this.draw();
 }
 CanvasViewer.prototype.draw = function(){
 	if(this.imageOrigin.x+this.visibleSize.w > this.innerCanvas.width){
