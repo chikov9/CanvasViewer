@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<script type="text/javascript" src="tools.js"></script>
+	<script type="text/javascript" src="canvasLayer.js"></script>
+	<script type="text/javascript" src="canvasViewer.js"></script>
+	<script type="text/javascript" src="jquery-1.7.1.min.js"></script>
+	<script>
+		jQuery(document).ready(function(){
+			var viewer= new CanvasViewer(jQuery('#board'),document.getElementById('canvas_main'), document.getElementById('canvas_temp'),1200,1200);
+			viewer.init();
+			var canvas = document.createElement('canvas');
+			canvas.height = 510;
+			canvas.width = 420;
+			var image = new Image();
+			image.onload = function() {
+				canvas.getContext('2d').drawImage(image,0,0);
+				viewer.addLayer('dicom',0,0,420,510,canvas);
+			}
+			image.src = 'images.jpg';
+			$('#toolselect').change(function() {
+			  var tool = $(this).val();
+			  console.log('changing tool:',tool);
+			  viewer.setTool(tool);
+			});
+		});
+		
+	</script>
+</head>
+<body>
+<div id="board" style="position:relative; margin: 0 auto; width: 400px;">
+<canvas id="canvas_main" width="400" height="400" style="position:absolute; top:0; left:0"></canvas>
+<canvas id="canvas_temp" width="400" height="400" style="position:absolute; top:0; left:0"></canvas>
+</div>
+<select id="toolselect">
+<option value="none">none</option>
+<option value="line">line</option>
+</select>
+</body>
+</html>
