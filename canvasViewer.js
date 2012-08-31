@@ -3,13 +3,15 @@ function CanvasViewer(board, view_canvas, tmp_canvas,viewerWidth, viewerHeight){
 		this.view_canvas = view_canvas;
 		this.tmp_canvas = tmp_canvas;
 		this.board = board;
+		this.boardAngle = 0;
 		this.main_ctx = this.view_canvas.getContext('2d');
 		this.tmp_ctx = this.tmp_canvas.getContext('2d');
 		this.innerCanvas = document.createElement('canvas');
 		this.innerCanvasCtx = this.innerCanvas.getContext('2d');;
 		this.innerCanvas.width = viewerWidth;
 		this.innerCanvas.height = viewerHeight;
-		
+		this.rspacing = 1;
+		this.cspacing = 1;
 		this.innerCanvasDrawings = document.createElement('canvas');
 		this.innerCanvasDrawingsCtx = this.innerCanvasDrawings.getContext('2d');;
 		this.innerCanvasDrawings.width = viewerWidth;
@@ -24,7 +26,8 @@ function CanvasViewer(board, view_canvas, tmp_canvas,viewerWidth, viewerHeight){
 		this.zoom_step = 0.03;
 		this.tool = new tools['none'];
 		this.layers=[];
-		
+		this.padding = parseInt(jQuery(this.view_canvas).css('padding').replace('px',''));
+		var self = this;
 		this.getMousePos = function(evt) {
 			var x, y;
 			if (evt.layerX || evt.layerX == 0) { // Firefox
@@ -35,8 +38,8 @@ function CanvasViewer(board, view_canvas, tmp_canvas,viewerWidth, viewerHeight){
 			  y = evt.offsetY;
 			}
 			// return relative mouse position
-			evt._x = x;
-			evt._y = y;
+			evt._x = x-self.padding;
+			evt._y = y-self.padding;
 			return {
 			  x: evt._x,
 			  y: evt._y
@@ -50,7 +53,18 @@ function CanvasViewer(board, view_canvas, tmp_canvas,viewerWidth, viewerHeight){
 				ev.preventDefault();
 				ev.stopPropagation();
 				var delta = event.wheelDelta ? event.wheelDelta/40 : event.detail ? -event.detail : 0;				
-				self.zoomImage(delta > 0 ? false : true);
+				switch(self.tool.name){
+					case 'none':
+						self.zoomImage(delta > 0 ? false : true);
+						break;
+					default:
+						var func = self.tool[event.type];
+						if (func) {
+						  console.log('mouse wheel');
+						  func(event,delta);
+						}
+						break;
+				}
 			});
 			$div.mousedown(function(event, delta) {
 				event.preventDefault();
@@ -83,7 +97,13 @@ function CanvasViewer(board, view_canvas, tmp_canvas,viewerWidth, viewerHeight){
 						var func = self.tool[event.type];
 						if (func) {
 						  console.log('mouse up');
-						  func(event,self.tmp_ctx,self.tmp_canvas);
+						  var callback;
+						  if(self.tool.name=='line'){
+							callback = self.lineWidthCallback.bind(self);
+						  }else if(self.tool.name=='rect'){
+							callback = self.rectWidthCallback.bind(self);
+						  }
+						  func(event,self.tmp_ctx,self.tmp_canvas,callback);
 						  self.projectDraw();
 						}
 						break;
@@ -104,9 +124,15 @@ function CanvasViewer(board, view_canvas, tmp_canvas,viewerWidth, viewerHeight){
 						break;
 					default:
 						var func = self.tool[event.type];
+						
 						if (func) {
 						  console.log('drawing line');
-						  func(event,self.tmp_ctx,self.tmp_canvas);
+						  if(self.tool.name=='line'){
+							callback = self.lineWidthCallback.bind(self);
+						  }else if(self.tool.name=='rect'){
+							callback = self.rectWidthCallback.bind(self);
+						  }
+						  func(event,self.tmp_ctx,self.tmp_canvas,callback);
 						}
 						break;
 				}
@@ -120,7 +146,18 @@ function CanvasViewer(board, view_canvas, tmp_canvas,viewerWidth, viewerHeight){
 			});
 		}
 }
-
+CanvasViewer.prototype.lineWidthCallback = function(x0,y0,x1,y1){
+	console.log("calling drawtext");
+	var distance = this.getDistance(x0,y0,x1,y1)/10;
+	this.tmp_ctx.font = "10pt Arial";
+	this.tmp_ctx.fillText(distance.toFixed(3)+" cm",x0,y0);
+}
+CanvasViewer.prototype.rectWidthCallback = function(x,y,w,h){
+	console.log("calling drawtext");
+	var area = this.getArea(w,h)/100;
+	this.tmp_ctx.font = "10pt Arial";
+	this.tmp_ctx.fillText(area.toFixed(3)+" cm^2",x+w,y+h);
+}
 CanvasViewer.prototype.zoomImage = function(zoomOut){
 	if(zoomOut){
 		if(!this.canZoom)
@@ -180,6 +217,40 @@ CanvasViewer.prototype.changeSurface=function(board, view_canvas, tmp_canvas){
 	this.canZoom = true;
 	this.init();
 }
+CanvasViewer.prototype.rotate=function(angle){
+	this.boardAngle+=angle;
+	this.draw();
+}
+CanvasViewer.prototype.rotateLayer=function(layerName, angle){
+	var layer = null;
+	for(var i = 0; i< this.layers.length; i++){
+		if(layerName == this.layers[i].getName()){
+			layer = this.layers[i]
+			break;
+		}
+	}
+	if(layer==null){return false;}
+	layer.rotate(angle);
+	this.draw();
+	return true;
+}
+CanvasViewer.prototype.flipLayer=function(layerName,horizontal){
+	var layer = null;
+	for(var i = 0; i< this.layers.length; i++){
+		if(layerName == this.layers[i].getName()){
+			layer = this.layers[i]
+			break;
+		}
+	}
+	if(layer==null){return false;}
+	if(horizontal===true){
+		layer.flipHorizontal();
+	}else{
+		layer.flipVertical();
+	}
+	this.draw();
+	return true;
+}
 CanvasViewer.prototype.setTool=function(toolname){
 	var self = this;
 	if(toolname in tools){
@@ -190,20 +261,24 @@ CanvasViewer.prototype.setTool=function(toolname){
 			var tool = this;
 			this.started = false;
 			this.name = toolname;
-			this.invoke = function(ev){
+			this.invoke = function(ev,delta){
 				for(var i =0; i<self.layers.length; i++){
 					var layer = self.layers[i];
-					var func = layer[ev.type];
+					var func = layer[toolname];
 					if (func) {
-					  func(ev);
+					  func.call(self,ev,delta);
 					}
 				}
-			}
+			};
 			// This is called when you start holding down the mouse button.
 			// This starts the pencil drawing.
 			this.mousedown = function (ev,context) {
 				tool.started = true;
 				tool.invoke(ev);
+			};
+			
+			this.mousewheel = function(ev, delta) {
+				tool.invoke(ev,delta);
 			};
 
 			// This function is called every time you move the mouse. Obviously, it only 
@@ -297,11 +372,21 @@ CanvasViewer.prototype.draw = function(){
 	
 	this.innerCanvasCtx.clearRect(0, 0, this.innerCanvas.width, this.innerCanvas.height);
 	this.drawBackground();
+	var y = this.innerCanvas.height/2;
+	var x = this.innerCanvas.width/2;
+	var canvas_angle = this.boardAngle*Math.PI/180;
+	this.innerCanvasCtx.translate(x,y);
+	this.innerCanvasCtx.rotate(canvas_angle);
+	this.innerCanvasCtx.translate(-x,-y);
 	for(var i =0; i<this.layers.length; i++){
 		var layer = this.layers[i];
 		this.innerCanvasCtx.drawImage(layer.getCanvas(),layer.getX(),layer.getY(),layer.getWidth(),layer.getHeight());
 	}
 	this.innerCanvasCtx.drawImage(this.innerCanvasDrawings,0,0);
+	
+	this.innerCanvasCtx.translate(x,y);
+	this.innerCanvasCtx.rotate(-canvas_angle);
+	this.innerCanvasCtx.translate(-x,-y);
 	
 	this.main_ctx.drawImage(this.innerCanvas,this.imageOrigin.x,this.imageOrigin.y,this.visibleSize.w,this.visibleSize.h,0,0,this.view_canvas.width,this.view_canvas.height);
 	this.main_ctx.fillStyle = "rgb(150,29,28)";
@@ -310,4 +395,20 @@ CanvasViewer.prototype.draw = function(){
     this.main_ctx.strokeRect (30,30,20,20);
 	this.main_ctx.strokeStyle = "red";
     this.main_ctx.strokeRect (0,0,this.tmp_canvas.width,this.tmp_canvas.height);
+}
+CanvasViewer.prototype.setCalibration = function(rowspace, colspace){
+	this.rspacing = rowspace;
+	this.cspacing = colspace;
+	console.log("setCalibration: "+this.rspacing+" : "+this.cspacing);
+}
+CanvasViewer.prototype.getArea = function(w,h){
+	var wa = w*this.cspacing;
+	var ha = h*this.rspacing;
+	return wa*ha;	
+}
+CanvasViewer.prototype.getDistance = function(x0,y0,x1,y1){
+	var deltax = (x0-x1)*this.cspacing;
+	var deltay = (y0-y1)*this.rspacing;
+	var d = Math.sqrt(Math.pow(deltax,2)+Math.pow(deltay,2));
+	return d;
 }

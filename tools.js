@@ -53,7 +53,7 @@
       tool.y0 = ev._y;
     };
 
-    this.mousemove = function (ev,context,canvas) {
+    this.mousemove = function (ev,context,canvas,cb) {
       if (!tool.started) {
         return;
       }
@@ -70,11 +70,13 @@
       }
 
       context.strokeRect(x, y, w, h);
+	  if(cb)
+			cb(x,y,w,h);
     };
 
-    this.mouseup = function (ev,context,canvas) {
+    this.mouseup = function (ev,context,canvas,cb) {
       if (tool.started) {
-        tool.mousemove(ev,context,canvas);
+        tool.mousemove(ev,context,canvas,cb);
         tool.started = false;
       }
     };
@@ -83,13 +85,13 @@
 	  var tool = this;
 	  this.started = false;
 	  this.name = 'line';
-	  this.mousedown = function (ev) {
+	  this.mousedown = function (ev,context,canvas) {
 		tool.started = true;
 		tool.x0 = ev._x;
 		tool.y0 = ev._y;
 	  };
 
-	  this.mousemove = function (ev,context,canvas) {
+	  this.mousemove = function (ev,context,canvas,cb) {
 		if (!tool.started) {
 		  return;
 		}
@@ -103,11 +105,16 @@
 		context.lineTo(ev._x,   ev._y);
 		context.stroke();
 		context.closePath();
+		context.fillStyle = "red";
+		context.fillRect(tool.x0,tool.y0,8,8);
+		context.fillRect(ev._x,ev._y,8,8);
+		if(cb)
+			cb(tool.x0,tool.y0,ev._x,ev._y);
 	  };
 
-	  this.mouseup = function (ev,context,canvas) {
+	  this.mouseup = function (ev,context,canvas,cb) {
 		if (tool.started) {
-		  tool.mousemove(ev,context,canvas);
+		  tool.mousemove(ev,context,canvas,cb);
 		  tool.started = false;
 		}
 	  };
