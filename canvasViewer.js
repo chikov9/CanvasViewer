@@ -1,11 +1,15 @@
 
-function CanvasViewer(board, view_canvas, tmp_canvas,viewerWidth, viewerHeight){
+function CanvasViewer(board, view_canvas, tmp_canvas,viewerWidth, viewerHeight,id){
 		this.view_canvas = view_canvas;
 		this.tmp_canvas = tmp_canvas;
+		this.id = id;
 		this.board = board;
 		this.boardAngle = 0;
-		this.main_ctx = this.view_canvas.getContext('2d');
-		this.tmp_ctx = this.tmp_canvas.getContext('2d');
+		if(this.view_canvas)
+			this.main_ctx = this.view_canvas.getContext('2d');
+		if(this.tmp_canvas)
+			this.tmp_ctx = this.tmp_canvas.getContext('2d');
+			
 		this.innerCanvas = document.createElement('canvas');
 		this.innerCanvasCtx = this.innerCanvas.getContext('2d');;
 		this.innerCanvas.width = viewerWidth;
@@ -26,7 +30,10 @@ function CanvasViewer(board, view_canvas, tmp_canvas,viewerWidth, viewerHeight){
 		this.zoom_step = 0.03;
 		this.tool = new tools['none'];
 		this.layers=[];
-		this.padding = parseInt(jQuery(this.view_canvas).css('padding').replace('px',''));
+		if(this.view_canvas)
+			this.padding = parseInt(jQuery(this.view_canvas).css('padding').replace('px',''));
+		else
+			this.padding=0;
 		var self = this;
 		this.getMousePos = function(evt) {
 			var x, y;
@@ -48,6 +55,7 @@ function CanvasViewer(board, view_canvas, tmp_canvas,viewerWidth, viewerHeight){
 		this.bindEvents = function(){
 			var  $div = this.board;
 			var self = this;
+			$div.unbind();
 			$div.bind('mousewheel',function(ev, delta) {
 				var event = ev.originalEvent;
 				ev.preventDefault();
@@ -61,7 +69,7 @@ function CanvasViewer(board, view_canvas, tmp_canvas,viewerWidth, viewerHeight){
 						var func = self.tool[event.type];
 						if (func) {
 						  console.log('mouse wheel');
-						  func(event,delta);
+						  func.call(self.tool,event,delta);
 						}
 						break;
 				}
@@ -80,7 +88,7 @@ function CanvasViewer(board, view_canvas, tmp_canvas,viewerWidth, viewerHeight){
 						var func = self.tool[event.type];
 						if (func) {
 						  console.log('mouse down');
-						  func(event,self.tmp_ctx,self.tmp_canvas);
+						  func.call(self.tool,event,self.tmp_ctx,self.tmp_canvas);
 						}
 						break;
 				}
@@ -103,7 +111,7 @@ function CanvasViewer(board, view_canvas, tmp_canvas,viewerWidth, viewerHeight){
 						  }else if(self.tool.name=='rect'){
 							callback = self.rectWidthCallback.bind(self);
 						  }
-						  func(event,self.tmp_ctx,self.tmp_canvas,callback);
+						  func.call(self.tool,event,self.tmp_ctx,self.tmp_canvas,callback);
 						  self.projectDraw();
 						}
 						break;
@@ -124,7 +132,7 @@ function CanvasViewer(board, view_canvas, tmp_canvas,viewerWidth, viewerHeight){
 						break;
 					default:
 						var func = self.tool[event.type];
-						
+						var callback;
 						if (func) {
 						  console.log('drawing line');
 						  if(self.tool.name=='line'){
@@ -132,7 +140,7 @@ function CanvasViewer(board, view_canvas, tmp_canvas,viewerWidth, viewerHeight){
 						  }else if(self.tool.name=='rect'){
 							callback = self.rectWidthCallback.bind(self);
 						  }
-						  func(event,self.tmp_ctx,self.tmp_canvas,callback);
+						  func.call(self.tool,event,self.tmp_ctx,self.tmp_canvas,callback);
 						}
 						break;
 				}
@@ -255,18 +263,20 @@ CanvasViewer.prototype.setTool=function(toolname){
 	var self = this;
 	if(toolname in tools){
 		this.tool = new tools[toolname];
+		this.tool.self = self;
 	}else{
 		console.log('registering new tool');
 		tools[toolname] = function () {
 			var tool = this;
 			this.started = false;
 			this.name = toolname;
+			this.self = self;
 			this.invoke = function(ev,delta){
-				for(var i =0; i<self.layers.length; i++){
-					var layer = self.layers[i];
+				for(var i =0; i<this.self.layers.length; i++){
+					var layer = this.self.layers[i];
 					var func = layer[toolname];
 					if (func) {
-					  func.call(self,ev,delta);
+					  func.call(this.self,ev,delta);
 					}
 				}
 			};
@@ -321,7 +331,7 @@ CanvasViewer.prototype.addLayer = function(layer,layout){ //layout 0=center, 1=t
 	this.layers.push(layer);
 	this.draw();
 }
-CanvasViewer.prototype.drawBackground = function(){
+CanvasViewer.prototype.drawChezBackground = function(){
 	var countA = 0;
 	for(var i = 0; i < this.innerCanvas.width; i+=20){
 		var countB = 0;
@@ -347,12 +357,17 @@ CanvasViewer.prototype.drawBackground = function(){
 		countA++;
 	}
 }
+CanvasViewer.prototype.drawBackground = function(){
+	this.innerCanvasCtx.fillStyle = "black";
+	this.innerCanvasCtx.fillRect (0,0,this.innerCanvas.width,this.innerCanvas.height);
+}
 CanvasViewer.prototype.clearDrawings = function(){
 	console.log('clearing drawings');
 	this.innerCanvasDrawingsCtx.clearRect(0, 0, this.innerCanvasDrawings.width, this.innerCanvasDrawings.height);
 	this.draw();
 }
 CanvasViewer.prototype.draw = function(){
+	console.log("calling draw on:"+this.id);
 	if(this.imageOrigin.x+this.visibleSize.w > this.innerCanvas.width){
 		this.imageOrigin.x -= (this.imageOrigin.x+this.visibleSize.w) - this.innerCanvas.width;
 		if(this.imageOrigin.x < 0){
