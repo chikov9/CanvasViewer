@@ -55,6 +55,7 @@ function CanvasViewer(board, view_canvas, tmp_canvas,viewerWidth, viewerHeight,i
 		this.bindEvents = function(){
 			var  $div = this.board;
 			var self = this;
+			console.log('Event: tool selected is: '+ self.tool);
 			$div.unbind();
 			$div.bind('mousewheel',function(ev, delta) {
 				var event = ev.originalEvent;
@@ -205,15 +206,27 @@ CanvasViewer.prototype.translateImage = function(delta){
 	}
 	this.draw();
 }
-CanvasViewer.prototype.init = function(){
+CanvasViewer.prototype.init = function(drawImage){
 	this.visibleSize.w = this.view_canvas.width*this.zoom;
 	this.visibleSize.h = this.view_canvas.height*this.zoom;
 	this.imageOrigin.x = this.innerCanvas.width/2 - this.view_canvas.width/2;
 	this.imageOrigin.y = this.innerCanvas.height/2 - this.view_canvas.height/2;
-	this.draw();
+	
+	if(this.imageOrigin.x<0){
+		this.imageOrigin.x = 0;
+	}
+	if(this.imageOrigin.y < 0){
+		this.imageOrigin.y = 0;
+	}
+	
 	this.bindEvents();
+	
+	if(drawImage===false)
+		return;
+	
+	this.draw();
 }
-CanvasViewer.prototype.changeSurface=function(board, view_canvas, tmp_canvas){
+CanvasViewer.prototype.changeSurface=function(board, view_canvas, tmp_canvas, drawImage){
 	this.view_canvas = view_canvas;
 	this.tmp_canvas = tmp_canvas;
 	this.board = board;
@@ -223,7 +236,7 @@ CanvasViewer.prototype.changeSurface=function(board, view_canvas, tmp_canvas){
 	this.imageOrigin = {x:0,y:0};
 	this.zoom = 0.99;
 	this.canZoom = true;
-	this.init();
+	this.init(drawImage);
 }
 CanvasViewer.prototype.rotate=function(angle){
 	this.boardAngle+=angle;
@@ -261,6 +274,7 @@ CanvasViewer.prototype.flipLayer=function(layerName,horizontal){
 }
 CanvasViewer.prototype.setTool=function(toolname){
 	var self = this;
+	console.log('setting tool'+toolname);
 	if(toolname in tools){
 		this.tool = new tools[toolname];
 		this.tool.self = self;
@@ -404,12 +418,6 @@ CanvasViewer.prototype.draw = function(){
 	this.innerCanvasCtx.translate(-x,-y);
 	
 	this.main_ctx.drawImage(this.innerCanvas,this.imageOrigin.x,this.imageOrigin.y,this.visibleSize.w,this.visibleSize.h,0,0,this.view_canvas.width,this.view_canvas.height);
-	this.main_ctx.fillStyle = "rgb(150,29,28)";
-    this.main_ctx.fillRect (10,10,20,20);
-	this.main_ctx.strokeStyle = "red";
-    this.main_ctx.strokeRect (30,30,20,20);
-	this.main_ctx.strokeStyle = "red";
-    this.main_ctx.strokeRect (0,0,this.tmp_canvas.width,this.tmp_canvas.height);
 }
 CanvasViewer.prototype.setCalibration = function(rowspace, colspace){
 	this.rspacing = rowspace;
