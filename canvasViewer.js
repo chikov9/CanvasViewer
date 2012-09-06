@@ -135,7 +135,6 @@ function CanvasViewer(board, view_canvas, tmp_canvas,viewerWidth, viewerHeight,i
 						var func = self.tool[event.type];
 						var callback;
 						if (func) {
-						  console.log('drawing line');
 						  if(self.tool.name=='line'){
 							callback = self.lineWidthCallback.bind(self);
 						  }else if(self.tool.name=='rect'){

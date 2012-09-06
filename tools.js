@@ -68,7 +68,9 @@
       if (!w || !h) {
         return;
       }
-
+	  context.lineWidth = 3;
+	  context.strokeStyle = "red";
+	  context.fillStyle = "red";
       context.strokeRect(x, y, w, h);
 	  if(cb)
 			cb(x,y,w,h);
