@@ -113,7 +113,8 @@ function CanvasViewer(board, view_canvas, tmp_canvas,viewerWidth, viewerHeight,i
 							callback = self.rectWidthCallback.bind(self);
 						  }
 						  func.call(self.tool,event,self.tmp_ctx,self.tmp_canvas,callback);
-						  self.projectDraw();
+						  if(self.tool.name=='line'||self.tool.name=='rect'||self.tool.name=='pencil')
+							self.projectDraw();
 						}
 						break;
 				}
