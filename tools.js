@@ -9,36 +9,60 @@
   // The drawing pencil.
   tools.pencil = function () {
     var tool = this;
-    this.started = false;
-	this.name = 'pencil';
-    // This is called when you start holding down the mouse button.
-    // This starts the pencil drawing.
-    this.mousedown = function (ev,context) {
-		context.beginPath();
-		console.log(ev._x+" "+ev._y);
-        context.moveTo(ev._x, ev._y);
-        tool.started = true;
-    };
-
-    // This function is called every time you move the mouse. Obviously, it only 
-    // draws if the tool.started state is set to true (when you are holding down 
-    // the mouse button).
-    this.mousemove = function (ev,context) {
-      if (tool.started) {
-		console.log(ev._x+" "+ev._y);
-        context.lineTo(ev._x, ev._y);
-		context.lineWidth = 3;
-		context.strokeStyle = "red";
-        context.stroke();
+    this.moving = false;
+    this.name = 'line';
+    this.line = null;
+    this.points = null;
+    this.mousedown = function (ev,stage, layer,cb) {
+      var x1,y1;
+      if (tool.moving){
+          tool.moving = false; layer.draw();
+      } else {
+          var mousePos = stage.getMousePosition();
+          x1=mousePos.x;
+          y1=mousePos.y;
+          tool.points = [x1,y1,x1,y1];
+          tool.line = new Kinetic.Line({
+              points: tool.points,
+              stroke: "red",
+              strokeWidth: 15,
+              lineCap: "round",
+              lineJoin: "round"
+          });
+          layer.add(tool.line);
+          //start point and end point are the same
+          tool.moving = true;    
+          layer.drawScene();            
+      }
+      if(cb){
+        cb(x1,y1)
       }
     };
 
-    // This is called when you release the mouse button.
-    this.mouseup = function (ev,context) {
-      if (tool.started) {
-        tool.mousemove(ev,context);
-        tool.started = false;
+    this.mousemove = function (ev,stage,layer,cb) {
+      var x1,y1,x2,y2;
+      if (tool.moving) {
+          var mousePos = stage.getMousePosition();
+
+          x1=tool.line.getPoints()[0].x;
+          y1=tool.line.getPoints()[0].y;
+          x2 = mousePos.x;
+          y2 = mousePos.y;
+          tool.points.push(x2);
+          tool.points.push(y2);
+          tool.line.setPoints(tool.points)
+          tool.moving = true;
+          layer.drawScene();
       }
+      if(cb){
+        cb(x1,y1,x2,y2);
+      }
+    };
+
+    this.mouseup = function (ev,stage,layer,cb) {
+      tool.moving=false;
+      if(cb)
+        cb(tool.line.getPoints()[0].x,tool.line.getPoints()[0].y,tool.line.getPoints()[1].x,tool.line.getPoints()[1].y);
     };
   };
 
@@ -85,39 +109,59 @@
   };
   tools.line = function () {
 	  var tool = this;
-	  this.started = false;
+	  this.moving = false;
 	  this.name = 'line';
-	  this.mousedown = function (ev,context,canvas) {
-		tool.started = true;
-		tool.x0 = ev._x;
-		tool.y0 = ev._y;
+    this.line = null;
+	  this.mousedown = function (ev,stage, layer,cb) {
+      var x1,y1;
+		  if (tool.moving){
+          tool.moving = false; layer.draw();
+      } else {
+          var mousePos = stage.getMousePosition();
+          tool.line = new Kinetic.Line({
+              points: [0, 0, 50, 50],
+              stroke: "red"
+          });
+          layer.add(tool.line);
+          //start point and end point are the same
+          x1=mousePos.x;
+          y1=mousePos.y;
+          tool.line.getPoints()[0].x = x1;
+          tool.line.getPoints()[0].y = y1;
+          tool.line.getPoints()[1].x = x1;
+          tool.line.getPoints()[1].y = y1;
+
+          tool.moving = true;    
+          layer.drawScene();            
+      }
+      if(cb){
+        cb(x1,y1)
+      }
 	  };
 
-	  this.mousemove = function (ev,context,canvas,cb) {
-		if (!tool.started) {
-		  return;
-		}
+	  this.mousemove = function (ev,stage,layer,cb) {
+      var x1,y1,x2,y2;
+		  if (tool.moving) {
+          var mousePos = stage.getMousePosition();
 
-		context.clearRect(0, 0, canvas.width, canvas.height);
-		
-		context.beginPath();
-		context.lineWidth = 3;
-		context.strokeStyle = "red";
-		context.moveTo(tool.x0, tool.y0);
-		context.lineTo(ev._x,   ev._y);
-		context.stroke();
-		context.closePath();
-		context.fillStyle = "red";
-		context.fillRect(tool.x0,tool.y0,8,8);
-		context.fillRect(ev._x,ev._y,8,8);
-		if(cb)
-			cb(tool.x0,tool.y0,ev._x,ev._y);
+          x1=tool.line.getPoints()[0].x;
+          y1=tool.line.getPoints()[0].y;
+          x2 = mousePos.x;
+          y2 = mousePos.y;
+
+          tool.line.getPoints()[1].x = x2;
+          tool.line.getPoints()[1].y = y2;
+          tool.moving = true;
+          layer.drawScene();
+      }
+      if(cb){
+        cb(x1,y1,x2,y2);
+      }
 	  };
 
-	  this.mouseup = function (ev,context,canvas,cb) {
-		if (tool.started) {
-		  tool.mousemove(ev,context,canvas,cb);
-		  tool.started = false;
-		}
+	  this.mouseup = function (ev,stage,layer,cb) {
+		  tool.moving=false;
+      if(cb)
+        cb(tool.line.getPoints()[0].x,tool.line.getPoints()[0].y,tool.line.getPoints()[1].x,tool.line.getPoints()[1].y);
 	  };
 	};
