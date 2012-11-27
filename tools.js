@@ -14,6 +14,7 @@
     this.line = null;
     this.points = null;
     this.mousedown = function (ev,stage, layer,cb) {
+      stage.setDraggable(false);
       var x1,y1;
       if (tool.moving){
           tool.moving = false; layer.draw();
@@ -25,9 +26,9 @@
           tool.line = new Kinetic.Line({
               points: tool.points,
               stroke: "red",
-              strokeWidth: 15,
               lineCap: "round",
-              lineJoin: "round"
+              lineJoin: "round",
+              draggable: true
           });
           layer.add(tool.line);
           //start point and end point are the same
@@ -61,6 +62,16 @@
 
     this.mouseup = function (ev,stage,layer,cb) {
       tool.moving=false;
+      stage.setDraggable(true);
+      tool.line.on('mousedown',function(e){
+        tool.line.moveToTop()
+      })
+      tool.line.on('mouseover touchstart',function(e){
+        stage.setDraggable(false);
+      })
+      tool.line.on('mouseout touchend',function(e){
+        stage.setDraggable(true);
+      })
       if(cb)
         cb(tool.line.getPoints()[0].x,tool.line.getPoints()[0].y,tool.line.getPoints()[1].x,tool.line.getPoints()[1].y);
     };
@@ -69,42 +80,73 @@
   // The rectangle tool.
   tools.rect = function () {
     var tool = this;
-    this.started = false;
-	this.name = 'rect';
-    this.mousedown = function (ev) {
-      tool.started = true;
-      tool.x0 = ev._x;
-      tool.y0 = ev._y;
+    this.moving = false;
+    this.name = 'line';
+    this.rect = null;
+    this.points = null;
+    this.mousedown = function (ev,stage, layer,cb) {
+      stage.setDraggable(false);
+      var x1,y1;
+      if (tool.moving){
+          tool.moving = false; layer.draw();
+      } else {
+          var mousePos = stage.getMousePosition();
+          x1=mousePos.x;
+          y1=mousePos.y;
+          tool.points = [x1,y1,x1,y1];
+          tool.rect = new Kinetic.Rect({
+              x: x1,
+              y: y1,
+              width: 1,
+              height: 1,
+              stroke: "red",
+              fill: "red",
+              draggable: true
+          });
+          layer.add(tool.rect);
+          //start point and end point are the same
+          tool.moving = true;    
+          layer.drawScene();            
+      }
+      if(cb){
+        cb(x1,y1)
+      }
     };
 
-    this.mousemove = function (ev,context,canvas,cb) {
-      if (!tool.started) {
-        return;
+    this.mousemove = function (ev,stage,layer,cb) {
+      var x1,y1,x2,y2;
+      if (tool.moving) {
+          var mousePos = stage.getMousePosition();
+
+          x1=tool.points[0];
+          y1=tool.points[1];
+          x2 = mousePos.x;
+          y2 = mousePos.y;
+          tool.points[2]=x2;
+          tool.points[3]=y2;
+          tool.rect.setSize(x2-tool.points[0],y2-tool.points[1]);
+          tool.moving = true;
+          layer.drawScene();
       }
-
-      var x = Math.min(ev._x,  tool.x0),
-          y = Math.min(ev._y,  tool.y0),
-          w = Math.abs(ev._x - tool.x0),
-          h = Math.abs(ev._y - tool.y0);
-
-      context.clearRect(0, 0, canvas.width, canvas.height);
-
-      if (!w || !h) {
-        return;
+      if(cb){
+        cb(x1,y1,x2,y2);
       }
-	  context.lineWidth = 3;
-	  context.strokeStyle = "red";
-	  context.fillStyle = "red";
-      context.strokeRect(x, y, w, h);
-	  if(cb)
-			cb(x,y,w,h);
     };
 
-    this.mouseup = function (ev,context,canvas,cb) {
-      if (tool.started) {
-        tool.mousemove(ev,context,canvas,cb);
-        tool.started = false;
-      }
+    this.mouseup = function (ev,stage,layer,cb) {
+      stage.setDraggable(true);
+      tool.moving=false;
+      tool.rect.on('mousedown',function(e){
+        tool.rect.moveToTop()
+      })
+      tool.rect.on('mouseover touchstart',function(e){
+        stage.setDraggable(false);
+      })
+      tool.rect.on('mouseout touchend',function(e){
+        stage.setDraggable(true);
+      })
+      if(cb)
+        cb(tool.points[0],tool.points[1],tool.points[2],tool.points[3]);
     };
   };
   tools.line = function () {
@@ -113,6 +155,7 @@
 	  this.name = 'line';
     this.line = null;
 	  this.mousedown = function (ev,stage, layer,cb) {
+      stage.setDraggable(false);
       var x1,y1;
 		  if (tool.moving){
           tool.moving = false; layer.draw();
@@ -120,7 +163,8 @@
           var mousePos = stage.getMousePosition();
           tool.line = new Kinetic.Line({
               points: [0, 0, 50, 50],
-              stroke: "red"
+              stroke: "red",
+              draggable: true
           });
           layer.add(tool.line);
           //start point and end point are the same
@@ -160,7 +204,17 @@
 	  };
 
 	  this.mouseup = function (ev,stage,layer,cb) {
+      stage.setDraggable(true);
 		  tool.moving=false;
+      tool.line.on('mousedown',function(e){
+        tool.line.moveToTop()
+      })
+      tool.line.on('mouseover touchstart',function(e){
+        stage.setDraggable(false);
+      })
+      tool.line.on('mouseout touchend',function(e){
+        stage.setDraggable(true);
+      })
       if(cb)
         cb(tool.line.getPoints()[0].x,tool.line.getPoints()[0].y,tool.line.getPoints()[1].x,tool.line.getPoints()[1].y);
 	  };
