@@ -14,7 +14,6 @@
     this.line = null;
     this.points = null;
     this.mousedown = function (ev,stage, layer,cb) {
-      stage.setDraggable(false);
       var x1,y1;
       if (tool.moving){
           tool.moving = false; layer.draw();
@@ -62,15 +61,8 @@
 
     this.mouseup = function (ev,stage,layer,cb) {
       tool.moving=false;
-      stage.setDraggable(true);
       tool.line.on('mousedown',function(e){
         tool.line.moveToTop()
-      })
-      tool.line.on('mouseover touchstart',function(e){
-        stage.setDraggable(false);
-      })
-      tool.line.on('mouseout touchend',function(e){
-        stage.setDraggable(true);
       })
       if(cb)
         cb(tool.line.getPoints()[0].x,tool.line.getPoints()[0].y,tool.line.getPoints()[1].x,tool.line.getPoints()[1].y);
@@ -85,7 +77,6 @@
     this.rect = null;
     this.points = null;
     this.mousedown = function (ev,stage, layer,cb) {
-      stage.setDraggable(false);
       var x1,y1;
       if (tool.moving){
           tool.moving = false; layer.draw();
@@ -100,7 +91,6 @@
               width: 1,
               height: 1,
               stroke: "red",
-              fill: "red",
               draggable: true
           });
           layer.add(tool.rect);
@@ -134,16 +124,9 @@
     };
 
     this.mouseup = function (ev,stage,layer,cb) {
-      stage.setDraggable(true);
       tool.moving=false;
       tool.rect.on('mousedown',function(e){
         tool.rect.moveToTop()
-      })
-      tool.rect.on('mouseover touchstart',function(e){
-        stage.setDraggable(false);
-      })
-      tool.rect.on('mouseout touchend',function(e){
-        stage.setDraggable(true);
       })
       if(cb)
         cb(tool.points[0],tool.points[1],tool.points[2],tool.points[3]);
@@ -155,7 +138,7 @@
 	  this.name = 'line';
     this.line = null;
 	  this.mousedown = function (ev,stage, layer,cb) {
-      stage.setDraggable(false);
+      
       var x1,y1;
 		  if (tool.moving){
           tool.moving = false; layer.draw();
@@ -167,6 +150,7 @@
               draggable: true
           });
           layer.add(tool.line);
+          tool.line.moveToTop()
           //start point and end point are the same
           x1=mousePos.x;
           y1=mousePos.y;
@@ -204,17 +188,7 @@
 	  };
 
 	  this.mouseup = function (ev,stage,layer,cb) {
-      stage.setDraggable(true);
-		  tool.moving=false;
-      tool.line.on('mousedown',function(e){
-        tool.line.moveToTop()
-      })
-      tool.line.on('mouseover touchstart',function(e){
-        stage.setDraggable(false);
-      })
-      tool.line.on('mouseout touchend',function(e){
-        stage.setDraggable(true);
-      })
+      tool.moving=false;
       if(cb)
         cb(tool.line.getPoints()[0].x,tool.line.getPoints()[0].y,tool.line.getPoints()[1].x,tool.line.getPoints()[1].y);
 	  };

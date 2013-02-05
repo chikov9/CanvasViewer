@@ -1,5 +1,5 @@
 
-function CanvasViewer(stage,container,id,eventsUtils){
+function CanvasViewer(stages,stage,container,id,eventsUtils){
 		if(stage){
 			this.id = id;
 			this.bindedFunctions = {'mousewheel':[],'mousedown':[],'mouseup':[],'mousemove':[]}
@@ -9,16 +9,38 @@ function CanvasViewer(stage,container,id,eventsUtils){
 			this.mouseStart=[];
 			this.tool = new tools['none'];
 			this.stage = stage;
+			this.stagesList = stages;
 			this.layer = this.stage.get('#drawinglayer')[0];
 			this.container = $(container);
 			this.eventsUtils = eventsUtils;
-			var self = this;
-			this.bindEvents = function(){
-				var  $div = this.board;
+			this.OverlayTextTL==undefined;//top left
+			this.OverlayTextTR==undefined; //top right
+			this.OverlayTextBR==undefined; //bottom right
+			this.OverlayTextBL==undefined; //bottom left
+			this.backRuler == undefined;
+			this.sideRuler == undefined;
+			this.backRulerLines = [];
+			this.sideRulerLines = [];
+
+			this.bindEvents = function(viewer_mode){
 				var self = this;
-				console.log('Event: tool selected is: '+ self.tool);
-				self.container.unbind();
-				self.container.bind('mousewheel',function(ev, delta) {
+				var  $div = this.board;
+				if(viewer_mode!=undefined){
+					console.log("set binding tool ", viewer_mode);
+					this.tool = new tools[viewer_mode];
+					this.tool.self = this;
+				}
+				console.log('Event: tool selected is: '+ this.tool.name);
+				this.container.unbind();
+				this.container.bind('mouseover',function(ev){
+					var event = ev.originalEvent;
+					var $currentTarget = jQuery(event.currentTarget);
+					var targetIdx = parseInt($currentTarget.attr('id').substring(7))-1;
+					self.stage = self.stagesList[targetIdx]
+					console.log(targetIdx);
+					self.bindEvents();
+				});
+				this.container.bind('mousewheel',function(ev, delta) {
 					var event = ev.originalEvent;
 					ev.preventDefault();
 					ev.stopPropagation();
@@ -42,8 +64,8 @@ function CanvasViewer(stage,container,id,eventsUtils){
 							break;
 					}
 				});
-				self.stage.off('mousedown');
-				self.stage.on('mousedown',function(event, delta) {
+				this.stage.off('mousedown');
+				this.stage.on('mousedown',function(event, delta) {
 					for(var i = 0; i<self.bindedFunctions['mousedown'].length;i++){
 						self.bindedFunctions['mousedown'][i].call(self,event);
 					}
@@ -59,13 +81,20 @@ function CanvasViewer(stage,container,id,eventsUtils){
 							break;
 					}
 				});
-				self.stage.off('mouseup');
-				self.stage.on('mouseup',function(event, delta) {
+				this.stage.off('mouseup');
+				this.stage.on('mouseup',function(event, delta) {
 					for(var i = 0; i<self.bindedFunctions['mouseup'].length;i++){
 						self.bindedFunctions['mouseup'][i].call(self,event);
 					}
 					switch(self.tool.name){
 						case 'none':
+							break;
+						case 'line':
+							var func = self.tool[event.type];
+							if (func) {
+							  console.log('mouse up');
+							  func.call(self.tool,event,self.stage,self.layer, self.lineCallback.bind(self));
+							}
 							break;
 						default:
 							var func = self.tool[event.type];
@@ -76,8 +105,8 @@ function CanvasViewer(stage,container,id,eventsUtils){
 							break;
 					}
 				});
-				self.stage.off('mousemove');
-				self.stage.on('mousemove',function(event, delta) {
+				this.stage.off('mousemove');
+				this.stage.on('mousemove',function(event, delta) {
 					for(var i = 0; i<self.bindedFunctions['mousemove'].length;i++){
 						self.bindedFunctions['mousemove'][i].call(self,event);
 					}
@@ -93,7 +122,7 @@ function CanvasViewer(stage,container,id,eventsUtils){
 					}
 				});
 				
-				self.container.bind("contextmenu", function(e) {
+				this.container.bind("contextmenu", function(e) {
 					return false;
 				});
 			}
@@ -157,29 +186,45 @@ CanvasViewer.prototype.setTool=function(toolname){
 		this.tool = new tools[toolname];
 		this.tool.self = self;
 	}
+	if(this.bindEvents){
+		console.log("rebinding events");
+		this.bindEvents();
+	}
 }
-CanvasViewer.prototype.drawBackgroundImage = function(x, y, imageW, imageH,newCanvas){
+CanvasViewer.prototype.refreshEvents = function(eventsList){
+	this.eventsUtils = eventsList;
+}
+CanvasViewer.prototype.drawBackgroundImage = function(x, y, imageW, imageH,newCanvas,newstage,newcontainer,viewer_mode){
+	if(newstage!=undefined){
+		this.stage = newstage;
+		this.container = newcontainer;
+		this.bindEvents(viewer_mode);
+	}
+		
+	this.layer = this.stage.get('#drawinglayer')[0];
 	var image = this.layer.get('#imagebg')[0];
 	if(image){
-		image.setDrawFunc(function(context) {
+		image.setDrawFunc(function(canvas) {
+			context = canvas.getContext('2d');
 	        context.drawImage(newCanvas,x, y, imageW, imageH);
 	    });
 	}else{
 		image = new Kinetic.Shape({
-	      drawFunc: function(context) {
-	        context.drawImage(newCanvas,x, y, imageW, imageH);
-	      },
 	      fill: "#00D2FF",
 	      stroke: "black",
 	      strokeWidth: 4,
 	      id:'imagebg'
 	    });
+	    image.setDrawFunc(function(canvas) {
+	    	context = canvas.getContext('2d');
+	        context.drawImage(newCanvas,x, y, imageW, imageH);
+	    });
 	    this.layer.add(image);
 	}
+	image.moveToBottom();
     this.layer.draw();
-    image.moveToBottom();
 }
-CanvasViewer.prototype.setCalibration = function(rowspace, colspace){
+CanvasViewer.prototype.setCalibration = function(colspace,rowspace){
 	this.rspacing = rowspace;
 	this.cspacing = colspace;
 	console.log("setCalibration: "+this.rspacing+" : "+this.cspacing);
@@ -189,11 +234,29 @@ CanvasViewer.prototype.getArea = function(w,h){
 	var ha = h*this.rspacing;
 	return wa*ha;	
 }
+CanvasViewer.prototype.setScale = function(scale){
+	console.log("Scale ",scale[0]," ",scale[1])
+	this.scale = scale;
+}
 CanvasViewer.prototype.getDistance = function(x0,y0,x1,y1){
-	var deltax = (x0-x1)*this.cspacing;
-	var deltay = (y0-y1)*this.rspacing;
+	var deltax = (x0-x1)*this.cspacing*this.scale[0];
+	var deltay = (y0-y1)*this.rspacing*this.scale[1];
 	var d = Math.sqrt(Math.pow(deltax,2)+Math.pow(deltay,2));
 	return d;
+}
+CanvasViewer.prototype.lineCallback = function(x0,y0,x1,y1){
+	console.log("calling drawtext");
+	var distance = this.getDistance(x0,y0,x1,y1)/10;
+	var simpleText = new Kinetic.Text({
+        x: x1+10,
+        y: y1+10,
+        text: distance.toFixed(3)+" cm",
+        fontSize: 20,
+        fontFamily: 'Calibri light',
+        stroke: 'red'
+    });
+	this.layer.add(simpleText);
+	this.layer.draw();
 }
 CanvasViewer.prototype.flipLayer=function(layerName,horizontal){
 	var layer = null;
@@ -211,6 +274,148 @@ CanvasViewer.prototype.flipLayer=function(layerName,horizontal){
 	}
 	this.draw();
 	return true;
+}
+CanvasViewer.prototype.drawOverlays=function(overlayInfo,ww,wc,forced){
+	var stageWidth = this.stage.getWidth();
+	var stageHeight = this.stage.getHeight();
+	if(forced===true){
+		this.OverlayTextTL.remove();
+		this.OverlayTextTL=undefined;
+
+		this.OverlayTextTR.remove();
+		this.OverlayTextTR=undefined;
+
+		this.OverlayTextBR.remove();
+		this.OverlayTextBR=undefined;
+	}
+
+	if(this.OverlayTextTL==undefined){
+		this.OverlayTextTL = new Kinetic.Text({
+	        x: 30,
+	        y: 30,
+	        text: "Patient: "+overlayInfo.PN+"\nPatient ID: "+overlayInfo.PID + "\nW/L: "+ww+"/"+wc,
+	        fontSize: 14,
+	        fill: 'white',
+	        fontFamily: 'Calibri light'
+	    });
+	}else{
+		this.OverlayTextTL.setText("Patient: "+overlayInfo.PN+"\nPatient ID: "+overlayInfo.PID + "\nW/L: "+ww+"/"+wc);
+	}
+
+	if(this.OverlayTextTR==undefined){
+		this.OverlayTextTR = new Kinetic.Text({
+	        x: stageWidth-150,
+	        y: 30,
+	        text: overlayInfo.DAT+"\nModality: "+overlayInfo.MOD + "\nSerie: "+overlayInfo.SEN,
+	        fontSize: 14,
+	        fill: 'white',
+	        fontFamily: 'Calibri light'
+	    });
+	}else{
+		this.OverlayTextTR.setText(overlayInfo.DAT+"\nModality: "+overlayInfo.MOD + "\nSerie: "+overlayInfo.SEN);
+	}
+
+	if(this.OverlayTextBR==undefined){
+		this.OverlayTextBR = new Kinetic.Text({
+	        x: stageWidth-150,
+	        y: stageHeight-30,
+	        text: "Study: "+overlayInfo.STN + "\nMade with MedViewer",
+	        fontSize: 14,
+	        fill: 'white',
+	        fontFamily: 'Calibri light'
+	    });
+	}else{
+		this.OverlayTextBR.setText("Study: "+overlayInfo.STN + "\nMade with MedViewer");
+	}
+
+	this.layer.add(this.OverlayTextTL);
+	this.layer.add(this.OverlayTextTR);
+	this.layer.add(this.OverlayTextBR);
+
+	this.layer.draw();
+	this.addMetricRuler(forced);
+}
+CanvasViewer.prototype.addMetricRuler=function(forced){
+	var stageWidth = this.stage.getWidth();
+	var stageHeight = this.stage.getHeight();
+
+	if(forced===true){
+		this.backRuler.remove();
+		this.backRuler=undefined;
+
+		this.sideRuler.remove();
+		this.sideRuler=undefined;
+	}
+
+	var ux = this.cspacing*this.scale[0];
+	var uy = this.rspacing*this.scale[1];
+	var rulerux = 10/ux;
+	var ruleruy = 10/uy;
+	var rulerBLine = 15/ux;
+	var rulerSLine = 5/ux;
+	var ruleruy = 10/uy;
+	var rulerx = 150/ux;
+	var rulery = 150/uy;
+	var startx = (stageWidth/2)-(rulerx/2);
+	var starty = (stageHeight/2)-(rulery/2);
+	
+
+	if(this.backRuler==undefined){
+		this.backRuler = new Kinetic.Line({
+
+	      points: [startx, stageHeight-40, startx+rulerx, stageHeight-40],
+	      stroke: "red",
+	      draggable: false
+	  	});
+	}else{
+		this.backRuler.setPoints([startx, stageHeight-50, startx+rulerx, stageHeight-50]);
+	}
+
+	if(this.sideRuler==undefined){
+		this.sideRuler = new Kinetic.Line({
+	      points: [stageWidth-50, starty, stageWidth-50, starty+rulery],
+	      stroke: "red",
+	      draggable: false
+	  	});
+	}else{
+		this.sideRuler.setPoints([stageWidth-50, starty, stageWidth-50, starty+rulery]);
+	}
+
+	for(var i = 0; i < 16; i++){
+		var start = startx+(rulerux*i);
+		if(i%5==0){
+			var offsetH = rulerBLine;
+		}else{
+			var offsetH = rulerSLine;
+		}
+		if(this.backRulerLines[i]==undefined){
+			this.backRulerLines[i] = new Kinetic.Line({
+		      points: [start, stageHeight-40, start, stageHeight-40 - offsetH],
+		      stroke: "red",
+		      draggable: false
+		  	});
+		}else{
+			this.backRulerLines[i].setPoints([start, stageHeight-40, start, stageHeight-40 - offsetH]);
+		}
+
+		var start = starty+(ruleruy*i);
+		if(this.sideRulerLines[i]==undefined){
+			this.sideRulerLines[i] = new Kinetic.Line({
+		      points: [stageWidth-50, start, stageWidth-50-offsetH, start],
+		      stroke: "red",
+		      draggable: false
+		  	});
+		}else{
+			this.sideRulerLines[i].setPoints([stageWidth-50, start, stageWidth-50-offsetH, start]);
+		}
+
+		this.layer.add(this.sideRulerLines[i]);
+		this.layer.add(this.backRulerLines[i]);
+	}
+
+    this.layer.add(this.backRuler);
+    this.layer.add(this.sideRuler);
+    this.layer.draw();
 }
 CanvasViewer.prototype.rotate=function(angle){
 	throw('unimplemented')
