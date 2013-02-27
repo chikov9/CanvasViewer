@@ -11,6 +11,7 @@ function CanvasViewer(stages,stage,container,id,eventsUtils){
 			this.stage = stage;
 			this.stagesList = stages;
 			this.layer = this.stage.get('#drawinglayer')[0];
+			this.layerOverlay = stage.get('#overlaylayer')[0];
 			this.container = $(container);
 			this.eventsUtils = eventsUtils;
 			this.OverlayTextTL==undefined;//top left
@@ -21,6 +22,7 @@ function CanvasViewer(stages,stage,container,id,eventsUtils){
 			this.sideRuler == undefined;
 			this.backRulerLines = [];
 			this.sideRulerLines = [];
+			this.mouse_position = { x:0, y: 0};
 
 			this.bindEvents = function(viewer_mode){
 				var self = this;
@@ -51,8 +53,50 @@ function CanvasViewer(stages,stage,container,id,eventsUtils){
 					switch(self.tool.name){
 						case '':
 						case 'none':
+							self.tool = new tools['Browse'];
+							self.tool.self = self;
+							var func = self.tool[event.type];
+							if (func) {
+							  console.log('mouse wheel');
+							  func.call(self.tool,event,self.stage,self.layer,delta);
+							}
+							self.tool.name='none';
+							break;
+						case 'zoom':
 							var zoomAmount = event.wheelDeltaY*0.001;
-							self.layer.setScale(self.layer.getScale().x+zoomAmount)
+							
+							var cnvsPos = CanvasViewer.getPos(self.stage.content);
+							console.log("mouse:", cnvsPos);
+							var R={  
+					            x: self.mouse_position.x,
+					            y: self.mouse_position.y
+					        }
+					        console.log("position:",self.mouse_position);
+					        var off0=self.layer.getPosition();
+					        var scl0=self.layer.getScale().x;
+					        var w=self.stage.getWidth();
+					        var h=self.stage.getHeight();
+					        var zP={
+					            //use these first two lines to center the image on the clicked point while zooming
+					            //x: w/2,
+					            //y: h/2
+					            //use these next two lines to zoom the image around the clicked point
+					            x: R.x-cnvsPos.x,
+					            y: R.y-cnvsPos.y                
+					        }
+					        var xA={
+					            x:(R.x-off0.x-cnvsPos.x)/scl0,
+					            y:(R.y-off0.y-cnvsPos.y)/scl0
+					        }
+					        var sclf = scl0+zoomAmount;
+					        self._zoomRoller(sclf);
+					        self.layer.setScale(sclf);
+					        var newR={
+					            x: zP.x-sclf*xA.x,
+					            y: zP.y-sclf*xA.y
+					        }
+					        console.log("new:", newR);
+							self.layer.setPosition(newR.x, newR.y)
 						  	self.layer.draw();
 							break;
 						default:
@@ -70,7 +114,16 @@ function CanvasViewer(stages,stage,container,id,eventsUtils){
 						self.bindedFunctions['mousedown'][i].call(self,event);
 					}
 					switch(self.tool.name){
-						case 'none':
+						case '':
+						case 'none':						
+							self.tool = new tools['Window_Level'];
+							self.tool.self = self;
+							var func = self.tool[event.type];
+							if (func) {
+							  console.log('mouse down');
+							  func.call(self.tool,event,self.stage,self.layer);
+							}
+							self.tool.name='none';
 							break;
 						default:
 							var func = self.tool[event.type];
@@ -87,7 +140,13 @@ function CanvasViewer(stages,stage,container,id,eventsUtils){
 						self.bindedFunctions['mouseup'][i].call(self,event);
 					}
 					switch(self.tool.name){
+						case '':
 						case 'none':
+							var func = self.tool[event.type];
+							if (func) {
+							  console.log('mouse up');
+							  func.call(self.tool,event,self.stage,self.layer);
+							}
 							break;
 						case 'line':
 							var func = self.tool[event.type];
@@ -107,11 +166,18 @@ function CanvasViewer(stages,stage,container,id,eventsUtils){
 				});
 				this.stage.off('mousemove');
 				this.stage.on('mousemove',function(event, delta) {
+					self.mouse_position.x = event.pageX;
+					self.mouse_position.y = event.pageY;
 					for(var i = 0; i<self.bindedFunctions['mousemove'].length;i++){
 						self.bindedFunctions['mousemove'][i].call(self,event);
 					}
 					switch(self.tool.name){
+						case '':
 						case 'none':
+						    var func = self.tool[event.type];
+							if (func) {
+							  func.call(self.tool,event,self.stage,self.layer);
+							}
 							break;
 						default:
 							var func = self.tool[event.type];
@@ -129,7 +195,12 @@ function CanvasViewer(stages,stage,container,id,eventsUtils){
 			this.bindEvents();
 		}
 }
-
+CanvasViewer.getPos=function(el) {
+    for (var lx=0, ly=0; el != null; el = el.offsetParent){
+    	lx += el.offsetLeft, ly += el.offsetTop
+    }
+    return {x: lx,y: ly};
+}
 CanvasViewer.prototype.bind=function(eventname,func){
 	if(eventname in this.bindedFunctions){
 		this.bindedFunctions[eventname].push(func);
@@ -202,6 +273,7 @@ CanvasViewer.prototype.drawBackgroundImage = function(x, y, imageW, imageH,newCa
 	}
 		
 	this.layer = this.stage.get('#drawinglayer')[0];
+	this.layerOverlay = this.stage.get('#overlaylayer')[0];
 	var image = this.layer.get('#imagebg')[0];
 	if(image){
 		image.setDrawFunc(function(canvas) {
@@ -293,7 +365,7 @@ CanvasViewer.prototype.drawOverlays=function(overlayInfo,ww,wc,forced){
 		this.OverlayTextTL = new Kinetic.Text({
 	        x: 30,
 	        y: 30,
-	        text: "Patient: "+overlayInfo.PN+"\nPatient ID: "+overlayInfo.PID + "\nW/L: "+ww+"/"+wc,
+	        text: "Patient: "+overlayInfo.PN+"\nPatient ID: "+overlayInfo.PID,
 	        fontSize: 14,
 	        fill: 'white',
 	        fontFamily: 'Calibri light'
@@ -328,14 +400,44 @@ CanvasViewer.prototype.drawOverlays=function(overlayInfo,ww,wc,forced){
 		this.OverlayTextBR.setText("Study: "+overlayInfo.STN + "\nMade with MedViewer");
 	}
 
-	this.layer.add(this.OverlayTextTL);
-	this.layer.add(this.OverlayTextTR);
-	this.layer.add(this.OverlayTextBR);
+	this.layerOverlay.add(this.OverlayTextTL);
+	this.layerOverlay.add(this.OverlayTextTR);
+	this.layerOverlay.add(this.OverlayTextBR);
 
-	this.layer.draw();
+	this.layerOverlay.draw();
 	this.addMetricRuler(forced);
+	this.drawDinamicOverlays(ww,wc,forced)
 }
-CanvasViewer.prototype.addMetricRuler=function(forced){
+CanvasViewer.prototype.drawDinamicOverlays=function(ww,wc,forced){
+	var stageWidth = this.stage.getWidth();
+	var stageHeight = this.stage.getHeight();
+	if(forced===true){
+		this.OverlayTextBL.remove();
+		this.OverlayTextBL=undefined;
+	}
+
+	if(this.OverlayTextBL==undefined){
+		this.OverlayTextBL = new Kinetic.Text({
+	        x: 30,
+	        y: stageHeight-30,
+	        text: "W/L: "+ww+"/"+wc,
+	        fontSize: 14,
+	        fill: 'white',
+	        fontFamily: 'Calibri light'
+	    });
+	}else{
+		this.OverlayTextBL.setText("W/L: "+ww+"/"+wc);
+	}
+	this.layerOverlay.add(this.OverlayTextBL);
+	this.layerOverlay.draw();
+}
+CanvasViewer.prototype._zoomRoller=function(zoom){
+	this.addMetricRuler(true, zoom);
+}
+CanvasViewer.prototype.addMetricRuler=function(forced, zoom){
+	if(zoom==undefined){
+		zoom = 1;
+	}
 	var stageWidth = this.stage.getWidth();
 	var stageHeight = this.stage.getHeight();
 
@@ -347,12 +449,12 @@ CanvasViewer.prototype.addMetricRuler=function(forced){
 		this.sideRuler=undefined;
 	}
 
-	var ux = this.cspacing*this.scale[0];
-	var uy = this.rspacing*this.scale[1];
+	var ux = this.cspacing*this.scale[0]/zoom;
+	var uy = this.rspacing*this.scale[1]/zoom;
 	var rulerux = 10/ux;
 	var ruleruy = 10/uy;
-	var rulerBLine = 15/ux;
-	var rulerSLine = 5/ux;
+	var rulerBLine = 9/ux/zoom;
+	var rulerSLine = 5/ux/zoom;
 	var ruleruy = 10/uy;
 	var rulerx = 150/ux;
 	var rulery = 150/uy;
@@ -409,13 +511,13 @@ CanvasViewer.prototype.addMetricRuler=function(forced){
 			this.sideRulerLines[i].setPoints([stageWidth-50, start, stageWidth-50-offsetH, start]);
 		}
 
-		this.layer.add(this.sideRulerLines[i]);
-		this.layer.add(this.backRulerLines[i]);
+		this.layerOverlay.add(this.sideRulerLines[i]);
+		this.layerOverlay.add(this.backRulerLines[i]);
 	}
 
-    this.layer.add(this.backRuler);
-    this.layer.add(this.sideRuler);
-    this.layer.draw();
+    this.layerOverlay.add(this.backRuler);
+    this.layerOverlay.add(this.sideRuler);
+    this.layerOverlay.draw();
 }
 CanvasViewer.prototype.rotate=function(angle){
 	throw('unimplemented')
